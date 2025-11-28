@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest House Room Allocation</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Guest House Room Allocation</h1>
+            <div class="header-actions">
+                <button id="manageBtn" class="btn btn-secondary">Manage</button>
+                <button id="shareBtn" class="btn btn-secondary">Share as Image</button>
+            </div>
+        </header>
+
+        <!-- Booking Form -->
+        <section class="booking-form-section">
+            <h2 id="formTitle">New Booking</h2>
+            <form id="bookingForm">
+                <input type="hidden" id="bookingId" value="">
+                <div class="form-group">
+                    <label for="bookingDate">Booking Date *</label>
+                    <input type="date" id="bookingDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="guestName">Guest Name *</label>
+                    <input type="text" id="guestName" required placeholder="Enter guest name">
+                </div>
+                <div class="form-group">
+                    <label for="numRooms">Number of Rooms *</label>
+                    <select id="numRooms" required>
+                        <option value="">Select...</option>
+                        <option value="1">1 Room</option>
+                        <option value="2">2 Rooms</option>
+                        <option value="3">3 Rooms</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="remarks">Remarks</label>
+                    <textarea id="remarks" rows="3" placeholder="Additional notes..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Booking</button>
+                    <button type="button" id="cancelBtn" class="btn btn-secondary" style="display: none;">Cancel</button>
+                </div>
+                <div id="errorMessage" class="error-message"></div>
+            </form>
+        </section>
+
+        <!-- View Toggle -->
+        <section class="view-controls">
+            <div class="view-toggle">
+                <button id="monthlyViewBtn" class="btn btn-toggle active">Monthly View</button>
+                <button id="weeklyViewBtn" class="btn btn-toggle">Weekly View</button>
+            </div>
+            <div class="calendar-navigation">
+                <button id="prevBtn" class="btn btn-nav">← Previous</button>
+                <span id="currentPeriod"></span>
+                <button id="nextBtn" class="btn btn-nav">Next →</button>
+            </div>
+        </section>
+
+        <!-- Calendar Views -->
+        <section class="calendar-section">
+            <div id="monthlyView" class="calendar-view active">
+                <div id="monthlyCalendar" class="monthly-calendar"></div>
+            </div>
+            <div id="weeklyView" class="calendar-view">
+                <div id="weeklyCalendar" class="weekly-calendar"></div>
+            </div>
+        </section>
+
+        <!-- Manage Menu Modal -->
+        <div id="manageModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manage</h2>
+                    <button class="close-btn" id="closeManageModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="manage-tabs">
+                        <button class="tab-btn active" data-tab="settings">Settings</button>
+                        <button class="tab-btn" data-tab="bookings">Bookings</button>
+                    </div>
+
+                    <!-- Settings Tab -->
+                    <div id="settingsTab" class="tab-content active">
+                        <h3>Room Settings</h3>
+                        <div id="roomSettings"></div>
+                        <div class="form-actions">
+                            <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+                        </div>
+                        <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e0e0;">
+                        <h3>Database & Spreadsheet</h3>
+                        <div style="display: grid; gap: 15px; margin-top: 15px;">
+                            <div style="padding: 15px; background: #e8f5e9; border-radius: 8px; border-left: 4px solid #4caf50;">
+                                <h4 style="margin-bottom: 10px;">✓ Auto-Save to Excel (Always Enabled)</h4>
+                                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">All bookings are automatically saved to <strong>Guest-House-Bookings.xlsx</strong> whenever you create, update, or delete a booking. The file is automatically downloaded to your computer.</p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                                    <button id="exportToExcelBtn" class="btn btn-primary">Export to Excel Now</button>
+                                    <span style="color: #4caf50; font-weight: 600; display: flex; align-items: center;">✓ Auto-saving enabled</span>
+                                </div>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <h4 style="margin-bottom: 10px;">Auto-Save to CSV (Optional)</h4>
+                                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Optionally also export to CSV file whenever data changes.</p>
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="autoSaveCsv" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <span>Enable Auto-Save to CSV</span>
+                                </label>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <h4 style="margin-bottom: 10px;">Manual Export</h4>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button id="exportToCsvBtn" class="btn btn-secondary">Export to CSV</button>
+                                    <button id="exportToJsonBtn" class="btn btn-secondary">Export to JSON</button>
+                                </div>
+                            </div>
+                            <div style="padding: 15px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
+                                <h4 style="margin-bottom: 10px;">Google Sheets Integration</h4>
+                                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Sync your bookings with Google Sheets. You'll need to set up Google Sheets API.</p>
+                                <div style="display: grid; gap: 10px;">
+                                    <input type="text" id="googleSheetId" placeholder="Google Sheet ID (optional)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                    <button id="syncGoogleSheetsBtn" class="btn btn-secondary">Sync with Google Sheets</button>
+                                </div>
+                                <p style="color: #999; font-size: 12px; margin-top: 10px;">Note: Google Sheets integration requires API setup. For now, use CSV export and import to Google Sheets manually.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bookings Tab -->
+                    <div id="bookingsTab" class="tab-content">
+                        <div class="bookings-controls">
+                            <h3>All Bookings</h3>
+                            <div class="filter-controls">
+                                <label>From: <input type="date" id="filterFromDate"></label>
+                                <label>To: <input type="date" id="filterToDate"></label>
+                                <button id="applyFilterBtn" class="btn btn-secondary">Apply Filter</button>
+                                <button id="clearFilterBtn" class="btn btn-secondary">Clear</button>
+                            </div>
+                            <div class="bulk-actions">
+                                <button id="exportJsonBtn" class="btn btn-secondary">Export JSON</button>
+                                <button id="exportCsvBtn" class="btn btn-secondary">Export CSV</button>
+                                <button id="bulkDeleteBtn" class="btn btn-danger">Delete Selected</button>
+                            </div>
+                        </div>
+                        <div id="bookingsList" class="bookings-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Booking Details Modal -->
+        <div id="bookingDetailsModal" class="modal">
+            <div class="modal-content small">
+                <div class="modal-header">
+                    <h2>Booking Details</h2>
+                    <button class="close-btn" id="closeBookingModal">&times;</button>
+                </div>
+                <div class="modal-body" id="bookingDetailsContent"></div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
+
+
