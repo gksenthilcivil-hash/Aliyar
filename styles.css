@@ -505,6 +505,65 @@ header h1 {
     display: block;
 }
 
+/* Database cards */
+.db-grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.db-card {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.db-status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.success {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status-badge.warning {
+    background: #fff8e1;
+    color: #f57c00;
+}
+
+.status-badge.error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.db-note {
+    font-size: 13px;
+    color: #777;
+}
+
+.db-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
 /* Room Settings */
 #roomSettings {
     display: grid;

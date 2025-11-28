@@ -6,7 +6,6 @@
     <title>Guest House Room Allocation</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -96,39 +95,29 @@
                             <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
                         </div>
                         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e0e0;">
-                        <h3>Database & Spreadsheet</h3>
-                        <div style="display: grid; gap: 15px; margin-top: 15px;">
-                            <div style="padding: 15px; background: #e8f5e9; border-radius: 8px; border-left: 4px solid #4caf50;">
-                                <h4 style="margin-bottom: 10px;">✓ Auto-Save to Excel (Always Enabled)</h4>
-                                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">All bookings are automatically saved to <strong>Guest-House-Bookings.xlsx</strong> whenever you create, update, or delete a booking. The file is automatically downloaded to your computer.</p>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                                    <button id="exportToExcelBtn" class="btn btn-primary">Export to Excel Now</button>
-                                    <span style="color: #4caf50; font-weight: 600; display: flex; align-items: center;">✓ Auto-saving enabled</span>
+                        <h3>Database & Integrations</h3>
+                        <div class="db-grid">
+                            <div class="db-card">
+                                <h4>Database Status</h4>
+                                <p>Bookings are stored in a local SQLite database through the Node.js backend.</p>
+                                <div class="db-status-row">
+                                    <span id="dbStatusBadge" class="status-badge warning">Checking...</span>
+                                    <button id="checkDbStatusBtn" class="btn btn-secondary">Check Connection</button>
+                                </div>
+                                <p class="db-note">Start the API server with <code>npm install</code> then <code>npm start</code>.</p>
+                            </div>
+                            <div class="db-card">
+                                <h4>Data Export</h4>
+                                <p>Download up-to-date booking data for Excel, Google Sheets, or any database.</p>
+                                <div class="db-actions">
+                                    <button id="exportToCsvBtn" class="btn btn-primary">Export CSV</button>
+                                    <button id="exportToJsonBtn" class="btn btn-secondary">Export JSON</button>
                                 </div>
                             </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <h4 style="margin-bottom: 10px;">Auto-Save to CSV (Optional)</h4>
-                                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Optionally also export to CSV file whenever data changes.</p>
-                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                    <input type="checkbox" id="autoSaveCsv" style="width: 20px; height: 20px; cursor: pointer;">
-                                    <span>Enable Auto-Save to CSV</span>
-                                </label>
-                            </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <h4 style="margin-bottom: 10px;">Manual Export</h4>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <button id="exportToCsvBtn" class="btn btn-secondary">Export to CSV</button>
-                                    <button id="exportToJsonBtn" class="btn btn-secondary">Export to JSON</button>
-                                </div>
-                            </div>
-                            <div style="padding: 15px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
-                                <h4 style="margin-bottom: 10px;">Google Sheets Integration</h4>
-                                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Sync your bookings with Google Sheets. You'll need to set up Google Sheets API.</p>
-                                <div style="display: grid; gap: 10px;">
-                                    <input type="text" id="googleSheetId" placeholder="Google Sheet ID (optional)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
-                                    <button id="syncGoogleSheetsBtn" class="btn btn-secondary">Sync with Google Sheets</button>
-                                </div>
-                                <p style="color: #999; font-size: 12px; margin-top: 10px;">Note: Google Sheets integration requires API setup. For now, use CSV export and import to Google Sheets manually.</p>
+                            <div class="db-card">
+                                <h4>Google Sheets</h4>
+                                <p>Import the CSV file into Google Sheets (File → Import → Upload).</p>
+                                <button id="exportForSheetsBtn" class="btn btn-secondary">Download CSV for Sheets</button>
                             </div>
                         </div>
                     </div>

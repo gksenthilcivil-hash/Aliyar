@@ -1,8 +1,14 @@
-// Application State
+// API & Application State
+const DEFAULT_API_BASE =
+    window.location.origin && window.location.origin !== 'null'
+        ? `${window.location.origin.replace(/\/$/, '')}/api`
+        : 'http://localhost:4000/api';
+const API_BASE_URL = window.API_BASE_URL || DEFAULT_API_BASE;
 let currentView = 'monthly'; // 'monthly' or 'weekly'
 let currentDate = new Date();
 let editingBookingId = null;
 let selectedBookings = new Set();
+let bookingsCache = [];
 
 // Room Settings
 let roomSettings = [
@@ -12,14 +18,13 @@ let roomSettings = [
 ];
 
 // Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadSettings();
-    loadBookings();
+    await refreshBookings();
     initializeEventListeners();
     setDefaultDate();
     renderCurrentView();
-    // Note: Excel auto-save happens automatically on booking changes
-    // Initial load export is skipped to avoid unnecessary downloads
+    checkDatabaseStatus();
 });
 
 function setDefaultDate() {
@@ -58,12 +63,10 @@ function initializeEventListeners() {
     renderRoomSettings();
 
     // Database/Spreadsheet
-    document.getElementById('exportToExcelBtn').addEventListener('click', exportToExcelNow);
+    document.getElementById('checkDbStatusBtn').addEventListener('click', checkDatabaseStatus);
     document.getElementById('exportToCsvBtn').addEventListener('click', exportToCsvNow);
+    document.getElementById('exportForSheetsBtn').addEventListener('click', exportToCsvNow);
     document.getElementById('exportToJsonBtn').addEventListener('click', exportJson);
-    document.getElementById('autoSaveCsv').addEventListener('change', toggleAutoSave);
-    document.getElementById('syncGoogleSheetsBtn').addEventListener('click', syncGoogleSheets);
-    loadAutoSaveSetting();
 
     // Bookings management
     document.getElementById('applyFilterBtn').addEventListener('click', applyFilter);
@@ -85,22 +88,24 @@ function initializeEventListeners() {
 }
 
 // Data Storage Functions
-function loadBookings() {
-    const stored = localStorage.getItem('guestHouseBookings');
-    if (stored) {
-        return JSON.parse(stored);
+async function refreshBookings(showToastOnError = true) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookings`);
+        if (!response.ok) {
+            throw new Error('Failed to load bookings');
+        }
+        bookingsCache = await response.json();
+    } catch (error) {
+        console.error('Error fetching bookings:', error);
+        if (showToastOnError) {
+            showToast('Unable to load bookings from the database.', 'error');
+        }
+        bookingsCache = [];
     }
-    return [];
 }
 
-function saveBookings(bookings) {
-    localStorage.setItem('guestHouseBookings', JSON.stringify(bookings));
-    // Always auto-save to Excel spreadsheet
-    autoSaveToExcel(bookings);
-    // Also auto-save to CSV if enabled
-    if (isAutoSaveEnabled()) {
-        autoSaveToCsv(bookings);
-    }
+function loadBookings() {
+    return bookingsCache;
 }
 
 function loadSettings() {
@@ -114,8 +119,42 @@ function saveSettingsToStorage() {
     localStorage.setItem('roomSettings', JSON.stringify(roomSettings));
 }
 
+async function createBookingOnServer(booking) {
+    const response = await fetch(`${API_BASE_URL}/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(booking)
+    });
+    if (!response.ok) {
+        const error = await safeJson(response);
+        throw new Error(error?.message || 'Failed to create booking');
+    }
+    return response.json();
+}
+
+async function updateBookingOnServer(booking) {
+    const response = await fetch(`${API_BASE_URL}/bookings/${booking.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(booking)
+    });
+    if (!response.ok) {
+        const error = await safeJson(response);
+        throw new Error(error?.message || 'Failed to update booking');
+    }
+    return response.json();
+}
+
+async function safeJson(response) {
+    try {
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
 // Booking Functions
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
     e.preventDefault();
     
     const bookingId = document.getElementById('bookingId').value;
@@ -167,21 +206,21 @@ function handleFormSubmit(e) {
         remarks: remarks || ''
     };
 
-    if (bookingId) {
-        // Update existing
-        const index = bookings.findIndex(b => b.id === bookingId);
-        if (index !== -1) {
-            bookings[index] = booking;
+    try {
+        if (bookingId) {
+            await updateBookingOnServer(booking);
+        } else {
+            await createBookingOnServer(booking);
         }
-    } else {
-        // Add new
-        bookings.push(booking);
+        await refreshBookings(false);
+        clearForm();
+        renderCurrentView();
+        renderBookingsList();
+        showToast('Booking saved successfully!', 'success');
+    } catch (error) {
+        console.error('Error saving booking:', error);
+        showToast(error.message || 'Unable to save booking. Please check the API server.', 'error');
     }
-
-    saveBookings(bookings);
-    clearForm();
-    renderCurrentView();
-    showToast('Booking saved successfully!', 'success');
 }
 
 function assignRooms(dateStr, numRooms, excludeBookingId) {
@@ -203,17 +242,28 @@ function assignRooms(dateStr, numRooms, excludeBookingId) {
     return availableRooms;
 }
 
-function deleteBooking(id) {
-    if (!confirm('Are you sure you want to delete this booking?')) {
+async function deleteBooking(id, skipConfirm = false, silent = false) {
+    if (!skipConfirm && !confirm('Are you sure you want to delete this booking?')) {
         return;
     }
 
-    const bookings = loadBookings();
-    const filtered = bookings.filter(b => b.id !== id);
-    saveBookings(filtered);
-    renderCurrentView();
-    renderBookingsList();
-    showToast('Booking deleted successfully!', 'success');
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookings/${id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to delete booking');
+        }
+        if (!silent) {
+            await refreshBookings(false);
+            renderCurrentView();
+            renderBookingsList();
+            showToast('Booking deleted successfully!', 'success');
+        }
+    } catch (error) {
+        console.error('Error deleting booking:', error);
+        showToast('Unable to delete booking. Please check the API server.', 'error');
+    }
 }
 
 function editBooking(id) {
@@ -640,6 +690,7 @@ function shareBookingAsImage(id) {
 function openManageMenu() {
     document.getElementById('manageModal').classList.add('active');
     renderBookingsList();
+    checkDatabaseStatus();
 }
 
 function closeManageMenu() {
@@ -699,15 +750,15 @@ function saveSettings() {
 // Bookings Management
 function renderBookingsList(filteredBookings = null) {
     const container = document.getElementById('bookingsList');
-    const bookings = filteredBookings || loadBookings();
+    const source = filteredBookings ? [...filteredBookings] : [...loadBookings()];
     
-    if (bookings.length === 0) {
+    if (source.length === 0) {
         container.innerHTML = '<p>No bookings found.</p>';
         return;
     }
 
     // Sort by date
-    bookings.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const bookings = source.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     container.innerHTML = '';
     selectedBookings.clear();
@@ -727,7 +778,7 @@ function renderBookingsList(filteredBookings = null) {
             </div>
             <div class="booking-item-actions">
                 <button class="btn btn-primary" onclick="editBooking('${booking.id}'); closeManageMenu();">Edit</button>
-                <button class="btn btn-danger" onclick="deleteBooking('${booking.id}'); renderBookingsList();">Delete</button>
+                <button class="btn btn-danger" onclick="deleteBooking('${booking.id}');">Delete</button>
             </div>
         `;
         
@@ -822,166 +873,39 @@ function exportCsvData(bookings, filename) {
     URL.revokeObjectURL(url);
 }
 
-// Auto-Save Functions
-function isAutoSaveEnabled() {
-    return localStorage.getItem('autoSaveCsv') === 'true';
-}
+// Database status helper
+async function checkDatabaseStatus(showToastOnError = false) {
+    const badge = document.getElementById('dbStatusBadge');
+    if (!badge) return;
+    setDbStatusBadge('warning', 'Checking...');
 
-function loadAutoSaveSetting() {
-    const checkbox = document.getElementById('autoSaveCsv');
-    if (checkbox) {
-        checkbox.checked = isAutoSaveEnabled();
-    }
-}
-
-function toggleAutoSave() {
-    const checkbox = document.getElementById('autoSaveCsv');
-    localStorage.setItem('autoSaveCsv', checkbox.checked ? 'true' : 'false');
-    if (checkbox.checked) {
-        // Immediately save current data
-        const bookings = loadBookings();
-        autoSaveToCsv(bookings);
-        showToast('Auto-save enabled! Current data exported.', 'success');
-    } else {
-        showToast('Auto-save disabled.', 'success');
-    }
-}
-
-function autoSaveToCsv(bookings) {
-    // Auto-save with a fixed filename so it overwrites
-    exportCsvData(bookings, 'guest-house-bookings-auto-save.csv');
-}
-
-// Excel Export Functions
-function autoSaveToExcel(bookings) {
-    // Auto-save to Excel with a fixed filename
-    if (typeof XLSX !== 'undefined') {
-        exportToExcel(bookings, 'Guest-House-Bookings.xlsx', false);
-    } else {
-        console.warn('XLSX library not loaded. Falling back to CSV.');
-        autoSaveToCsv(bookings);
-    }
-}
-
-function exportToExcel(bookings, filename, showToastMessage = true) {
     try {
-        if (typeof XLSX === 'undefined') {
-            showToast('Excel library not loaded. Please refresh the page.', 'error');
-            return;
-        }
-
-        // Prepare data for Excel
-        const headers = ['Date', 'Guest Name', 'Number of Rooms', 'Rooms', 'Remarks'];
-        const data = bookings.map(booking => {
-            const roomNames = booking.roomNumbers.map(r => roomSettings[r - 1]?.name || `Room ${r}`).join(', ');
-            return [
-                booking.date,
-                booking.name,
-                booking.rooms,
-                roomNames,
-                booking.remarks || ''
-            ];
-        });
-
-        // Create workbook
-        const wb = XLSX.utils.book_new();
-        
-        // Create worksheet with headers and data
-        const wsData = [headers, ...data];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // Set column widths
-        ws['!cols'] = [
-            { wch: 12 }, // Date
-            { wch: 25 }, // Guest Name
-            { wch: 15 }, // Number of Rooms
-            { wch: 20 }, // Rooms
-            { wch: 30 }  // Remarks
-        ];
-
-        // Add worksheet to workbook
-        XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
-
-        // Add summary sheet
-        const summaryData = [
-            ['Guest House Booking Summary'],
-            [''],
-            ['Total Bookings', bookings.length],
-            ['Total Rooms Booked', bookings.reduce((sum, b) => sum + b.rooms, 0)],
-            [''],
-            ['Room Statistics'],
-            ['Room', 'Total Bookings']
-        ];
-        
-        // Count bookings per room
-        const roomStats = {};
-        bookings.forEach(booking => {
-            booking.roomNumbers.forEach(roomNum => {
-                const roomName = roomSettings[roomNum - 1]?.name || `Room ${roomNum}`;
-                roomStats[roomName] = (roomStats[roomName] || 0) + 1;
-            });
-        });
-        
-        Object.entries(roomStats).forEach(([room, count]) => {
-            summaryData.push([room, count]);
-        });
-
-        const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-        summaryWs['!cols'] = [{ wch: 25 }, { wch: 15 }];
-        XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
-
-        // Write file
-        XLSX.writeFile(wb, filename);
-        
-        if (showToastMessage) {
-            showToast('Excel file saved successfully!', 'success');
+        const response = await fetch(`${API_BASE_URL}/health`);
+        if (!response.ok) throw new Error('API offline');
+        const data = await response.json();
+        const message = data?.status === 'ok' ? 'Connected' : 'Reachable';
+        setDbStatusBadge('success', message);
+        if (showToastOnError) {
+            showToast('Database connection restored.', 'success');
         }
     } catch (error) {
-        console.error('Error exporting to Excel:', error);
-        showToast('Error saving Excel file: ' + error.message, 'error');
-        // Fallback to CSV
-        exportCsvData(bookings, filename.replace('.xlsx', '.csv'));
+        console.error('API health check failed:', error);
+        setDbStatusBadge('error', 'Offline');
+        if (showToastOnError) {
+            showToast('Unable to reach the API server.', 'error');
+        }
     }
 }
 
-function exportToExcelNow() {
-    const bookings = loadBookings();
-    exportToExcel(bookings, `Guest-House-Bookings-${Date.now()}.xlsx`, true);
+function setDbStatusBadge(state, text) {
+    const badge = document.getElementById('dbStatusBadge');
+    if (!badge) return;
+    badge.textContent = text;
+    badge.classList.remove('success', 'warning', 'error');
+    badge.classList.add(state);
 }
 
-// Google Sheets Integration
-function syncGoogleSheets() {
-    const sheetId = document.getElementById('googleSheetId').value;
-    const bookings = loadBookings();
-    
-    if (!sheetId) {
-        showToast('Please enter a Google Sheet ID. For now, use CSV export and import manually to Google Sheets.', 'error');
-        // Still export CSV for manual import
-        exportToCsvNow();
-        return;
-    }
-    
-    // Note: Full Google Sheets API integration requires:
-    // 1. Google Cloud project setup
-    // 2. OAuth 2.0 authentication
-    // 3. Google Sheets API enabled
-    // For a simple HTML/CSS/JS solution, we'll export CSV that can be imported
-    
-    showToast('Google Sheets API requires backend setup. CSV exported for manual import.', 'error');
-    exportToCsvNow();
-    
-    // Instructions for manual import
-    alert(`To sync with Google Sheets:
-    
-1. Export the CSV file (just downloaded)
-2. Open Google Sheets
-3. File > Import > Upload > Select the CSV file
-4. Or paste the Sheet ID in the URL: https://docs.google.com/spreadsheets/d/${sheetId}
-
-For automatic sync, you'll need to set up Google Sheets API with OAuth.`);
-}
-
-function bulkDelete() {
+async function bulkDelete() {
     if (selectedBookings.size === 0) {
         showToast('Please select bookings to delete', 'error');
         return;
@@ -991,13 +915,19 @@ function bulkDelete() {
         return;
     }
     
-    const bookings = loadBookings();
-    const filtered = bookings.filter(b => !selectedBookings.has(b.id));
-    saveBookings(filtered);
-    renderBookingsList();
-    renderCurrentView();
-    showToast(`${selectedBookings.size} booking(s) deleted successfully!`, 'success');
-    selectedBookings.clear();
+    try {
+        await Promise.all(
+            Array.from(selectedBookings).map(id => deleteBooking(id, true, true))
+        );
+        selectedBookings.clear();
+        await refreshBookings(false);
+        renderBookingsList();
+        renderCurrentView();
+        showToast('Selected bookings deleted successfully!', 'success');
+    } catch (error) {
+        console.error('Bulk delete failed:', error);
+        showToast('Unable to delete selected bookings.', 'error');
+    }
 }
 
 // Utility Functions

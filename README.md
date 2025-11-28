@@ -36,31 +36,30 @@ A simple, modern web application for managing guest house room bookings with cal
     - Export bookings as JSON or CSV
 
 - **Data Persistence & Spreadsheet Integration**
-  - All data stored in browser localStorage
-  - Settings and bookings persist across sessions
-  - **Auto-Save to Excel (Always Enabled)**: All bookings are automatically saved to `Guest-House-Bookings.xlsx` whenever you create, update, or delete a booking
-  - Excel file includes:
-    - Bookings sheet with all booking details
-    - Summary sheet with statistics and room usage
-  - **Auto-Save to CSV (Optional)**: Optionally also export to CSV file
-  - **Manual Export**: Export to Excel, CSV, or JSON format anytime
-  - All booking data is automatically saved to spreadsheet format
+  - Bookings are stored in a local SQLite database via the Node.js API (`server.js`)
+  - Room settings persist in browser localStorage
+  - API responses power the calendar, manage view, and exports
+  - Manual exports: CSV (Excel/Sheets friendly) & JSON
+  - Google Sheets import workflow included (export CSV → import into Sheets)
 
 ## Usage
 
-1. Open `index.html` in a modern web browser
-2. Fill in the booking form to create a new booking
-3. Use the calendar views to see booking status
-4. Click on bookings in the calendar to view/edit/delete
-5. Use the "Manage" button to access settings and bookings management
-6. Use the "Share as Image" button to export calendar views
+1. Install dependencies: `npm install`
+2. Start the backend (and static hosting): `npm start`
+3. Visit [http://localhost:4000](http://localhost:4000) in a modern browser
+4. Fill in the booking form to create a new booking
+5. Use the calendar views to see booking status
+6. Click on bookings in the calendar to view/edit/delete
+7. Use the "Manage" button to access settings and bookings management
+8. Use the "Share as Image" button to export calendar views
 
 ## Technical Details
 
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript
-- **Storage**: localStorage (browser-based)
+- **Backend**: Node.js (Express) + SQLite database (`server.js`)
+- **Data Persistence**: SQLite for bookings, localStorage for room settings
 - **Image Export**: html2canvas library (loaded via CDN)
-- **No dependencies**: Pure vanilla JavaScript, no frameworks required
+- **Exports**: CSV/JSON generated client-side
 
 ## Browser Compatibility
 
@@ -74,8 +73,11 @@ Works best in modern browsers (Chrome, Firefox, Edge, Safari) that support:
 ```
 /
 ├── index.html          # Main HTML structure
-├── styles.css          # All styling and responsive design
-├── script.js           # Application logic and functionality
+├── styles.css          # Styling and responsive design
+├── script.js           # Frontend logic (consumes API)
+├── server.js           # Express + SQLite API server
+├── package.json        # Backend dependencies & scripts
+├── bookings.db         # SQLite database file (auto-created)
 └── README.md           # This file
 ```
 
@@ -94,39 +96,42 @@ Access room settings through the "Manage" menu → "Settings" tab.
 - Prevents double-booking of the same room
 - Shows clear error messages when rooms are unavailable
 
+## API Server
+
+- Start: `npm install` then `npm start` (runs on `http://localhost:4000`)
+- Endpoints:
+  - `GET /api/health` – quick status check
+  - `GET /api/bookings` – list bookings (JSON)
+  - `POST /api/bookings` – create booking
+  - `PUT /api/bookings/:id` – update booking
+  - `DELETE /api/bookings/:id` – remove booking
+- Data is stored in `bookings.db` (SQLite). Delete the file to reset.
+
 ## Export Options
 
 - **Image Export**: PNG format for calendar views and booking details
-- **JSON Export**: Complete booking data in JSON format
-- **CSV Export**: Booking data in CSV format for spreadsheet applications
-- **Auto-Save CSV**: Automatically saves bookings to CSV file whenever data changes (enable in Manage > Settings)
+- **JSON Export**: Complete booking data via Manage → Bookings or Settings
+- **CSV Export**: Booking data in CSV format for Excel/Google Sheets/databases
 
 ## Spreadsheet Integration
 
-The system automatically saves all booking data to Excel spreadsheets:
+All bookings live in the SQLite database. When you need spreadsheet access:
 
-1. **Auto-Save to Excel (Always Active)**: 
-   - All bookings are automatically saved to `Guest-House-Bookings.xlsx` whenever you:
-     - Create a new booking
-     - Update an existing booking
-     - Delete a booking
-   - The Excel file is automatically downloaded to your computer
-   - The file includes two sheets:
-     - **Bookings**: All booking details with columns (Date, Guest Name, Number of Rooms, Rooms, Remarks)
-     - **Summary**: Statistics including total bookings, total rooms booked, and room usage statistics
+1. **Export CSV**  
+   - Open Manage → Settings  
+   - Click `Export CSV` (or `Download CSV for Sheets`)  
+   - Import the downloaded file into Excel or Google Sheets (File → Import → Upload)
 
-2. **Manual Export**: 
-   - Click "Export to Excel Now" in Manage > Settings to export immediately
-   - Export to CSV or JSON formats as needed
+2. **Export JSON**  
+   - For integrations or backups, use the JSON export button
 
-3. **Opening the Excel File**:
-   - The file `Guest-House-Bookings.xlsx` will be in your browser's default download folder
-   - Open it with Microsoft Excel, Google Sheets, or any spreadsheet application
-   - The file is updated automatically whenever bookings change
+3. **Google Sheets Workflow**  
+   - Export CSV  
+   - Open Google Sheets → File → Import → Upload → Select CSV  
+   - Choose “Replace current sheet” or “Insert new sheet”
 
-4. **Database Integration**: 
-   - The Excel/CSV files can be imported into any database system (MySQL, PostgreSQL, etc.)
-   - Use the exported files for backup, reporting, or integration with other systems
+4. **Databases / Reporting Tools**  
+   - CSV/JSON files can be ingested into MySQL, PostgreSQL, Power BI, etc.
 
 
 

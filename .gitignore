@@ -1,0 +1,4 @@
+node_modules/
+bookings.db
+npm-debug.log*
+
